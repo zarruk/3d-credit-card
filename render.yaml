@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: 3d-credit-card
+    env: static
+    buildCommand: echo "No build needed for static site"
+    staticPublishPath: .
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0 
