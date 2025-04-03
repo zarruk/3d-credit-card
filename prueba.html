@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Credit Card</title>
+    <style>
+        /* Basic Reset and Body Styling */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            padding: 20px;
+            color: #333;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        /* Scene Container for Perspective */
+        .scene {
+            width: 300px; /* Standard credit card aspect ratio approx */
+            height: 189px;
+            perspective: 1000px; /* How far the object is from the viewer */
+            margin-bottom: 40px;
+        }
+
+        /* Card Container for 3D Transform */
+        .card-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.1s linear; /* Smooth rotation transition */
+            cursor: grab;
+            user-select: none; /* Prevent text selection during drag */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE */
+        }
+
+        .card-container:active {
+            cursor: grabbing;
+        }
+
+        /* Common Card Face Styling */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* Hide the back side when facing away */
+            -webkit-backface-visibility: hidden; /* Safari */
+            border-radius: 15px;
+            overflow: hidden; /* Clip content like logo */
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            /* Use CSS variables for dynamic styling */
+            /* Apply gradient background */
+            background-image: linear-gradient(to bottom right, var(--card-bg-color1, #4a90e2), var(--card-bg-color2, #8ec5fc));
+            color: var(--card-text-color, #ffffff); /* Default white */
+            transition: background-image 0.3s ease, color 0.3s ease; /* Note: Transitioning gradients can be tricky */
+        }
+
+        /* Card Front Specifics */
+        .card-front {
+            /* Front face is initially visible */
+            z-index: 2;
+        }
+
+        /* Card Back Specifics */
+        .card-back {
+            /* Back face is initially rotated 180 degrees */
+            /* Ensure back gradient matches */
+            background-image: linear-gradient(to bottom right, var(--card-bg-color1, #4a90e2), var(--card-bg-color2, #8ec5fc));
+            transform: rotateY(180deg);
+            color: #333; /* Typically different text color on back */
+            padding: 0; /* Remove padding for full-width stripe */
+        }
+
+        /* Card Elements Styling */
+        /* Updated Chip Styling */
+        .card-chip {
+            width: 45px; /* Slightly wider */
+            height: 35px; /* Slightly taller */
+            background: linear-gradient(135deg, #d4af37, #c0c0c0, #b08d57); /* Gold/Silver gradient */
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
+            margin-bottom: 10px; /* Adjusted margin */
+        }
+        /* Add inner element for contact pad look */
+        .card-chip::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 3px;
+             /* Simple line divisions */
+            background-image: linear-gradient(to right, transparent 48%, rgba(0,0,0,0.2) 48%, rgba(0,0,0,0.2) 52%, transparent 52%),
+                              linear-gradient(to bottom, transparent 48%, rgba(0,0,0,0.2) 48%, rgba(0,0,0,0.2) 52%, transparent 52%);
+            background-size: 100% 100%, 100% 100%; /* Ensure lines cover the area */
+        }
+
+
+        .card-logo-area {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            height: 40px; /* Increased height for bigger logo */
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .card-company-logo {
+            max-height: 100%; /* Use full area height */
+            max-width: 80px; /* Increased max width */
+            object-fit: contain;
+            display: none; /* Initially hidden */
+        }
+         .card-company-logo.visible {
+            display: block;
+         }
+         .card-company-logo.error {
+            /* Optional: style when image fails */
+            content: 'Error';
+            color: red;
+            font-size: 10px;
+         }
+
+
+        .card-number {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 18px;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.1);
+            align-self: center; /* Center the number */
+            margin-top: auto; /* Push towards middle */
+        }
+
+        .card-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 12px;
+            margin-top: auto; /* Push to bottom */
+        }
+
+        .card-holder-section {
+            max-width: 65%; /* Prevent long names overlapping */
+        }
+        .card-holder-label, .card-expiry-label {
+            font-size: 8px;
+            text-transform: uppercase;
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+        .card-holder-name {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-expiry-date {
+             font-family: 'Courier New', Courier, monospace;
+             font-size: 14px;
+             font-weight: 500;
+        }
+
+        .card-vendor-logo {
+            font-weight: bold;
+            font-style: italic;
+            font-size: 20px;
+            color: #fff; /* Keep Visa logo white */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            align-self: flex-end; /* Position bottom right */
+            margin-left: 10px; /* Space from expiry */
+        }
+
+        /* Back Face Elements */
+        .magnetic-stripe {
+            height: 40px;
+            background-color: #333;
+            margin-top: 25px; /* Position from top */
+        }
+
+        .signature-panel {
+            height: 35px;
+            background-color: #fff;
+            margin: 15px 20px; /* Padding around panel */
+            background-image: repeating-linear-gradient(
+                45deg,
+                #eee,
+                #eee 1px,
+                #fff 1px,
+                #fff 5px
+            ); /* Subtle pattern */
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding-right: 10px;
+        }
+
+        .cvv {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            font-style: italic;
+            color: #000;
+            background-color: #fff; /* Match panel bg */
+            padding: 2px 4px;
+            letter-spacing: 1px;
+        }
+
+        /* Controls Styling */
+        .controls {
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: grid;
+            /* Adjust grid columns for potentially more controls */
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px 20px; /* Row gap, Column gap */
+            width: 100%;
+            max-width: 700px; /* Slightly wider max-width */
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        /* Span color pickers if needed on smaller grids */
+         .control-group.color-picker {
+            /* grid-column: span 1; */ /* Default span */
+         }
+
+        .control-group label {
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .control-group input[type="color"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 40px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            cursor: pointer;
+            padding: 0; /* Remove default padding */
+            background-color: transparent; /* Ensure native color picker shows */
+        }
+        /* Style the color picker thumb */
+        .control-group input[type="color"]::-webkit-color-swatch-wrapper {
+             padding: 0;
+             border-radius: 5px;
+        }
+        .control-group input[type="color"]::-webkit-color-swatch {
+             border: none;
+             border-radius: 5px;
+        }
+        .control-group input[type="color"]::-moz-color-swatch {
+             border: none;
+             border-radius: 5px;
+        }
+
+
+        .control-group input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .control-group input[type="text"]:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+
+        .logo-toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            grid-column: 1 / -1; /* Span full width */
+            margin-top: 5px; /* Reduced space */
+            padding-top: 10px;
+            border-top: 1px solid #eee; /* Separator line */
+        }
+        .logo-toggle-group label {
+             margin-bottom: 0; /* Reset margin for inline label */
+             cursor: pointer;
+        }
+        .logo-toggle-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 400px) {
+            .scene {
+                width: 280px;
+                height: 176px; /* Maintain aspect ratio */
+            }
+            .card-number {
+                font-size: 16px;
+            }
+            .card-details {
+                font-size: 11px;
+            }
+            .card-holder-name, .card-expiry-date {
+                font-size: 13px;
+            }
+            .card-vendor-logo {
+                font-size: 18px;
+            }
+            .controls {
+                padding: 15px;
+                gap: 15px;
+                grid-template-columns: 1fr; /* Stack controls vertically */
+            }
+            .logo-toggle-group {
+                 grid-column: 1 / -1; /* Ensure it still spans */
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>3D Credit Card Customizer</h1>
+
+    <div class="scene">
+        <div class="card-container" id="cardContainer">
+            <div class="card-face card-front" id="cardFront">
+                <div class="card-top-row" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="card-chip"></div>
+                    <div class="card-logo-area">
+                        <img src="" alt="Company Logo" class="card-company-logo" id="companyLogo" onerror="this.classList.add('error'); this.style.display='none';" onload="this.classList.remove('error'); if(document.getElementById('toggleLogo').checked) this.style.display='block';">
+                    </div>
+                </div>
+                <div class="card-number" id="cardNumber">---- ---- ---- ----</div>
+                <div class="card-details">
+                    <div class="card-holder-section">
+                        <div class="card-holder-label">Card Holder</div>
+                        <div class="card-holder-name" id="cardHolderName">YOUR NAME HERE</div>
+                    </div>
+                    <div class="card-expiry-section">
+                        <div class="card-expiry-label">Expires</div>
+                        <div class="card-expiry-date" id="cardExpiry">MM/YY</div>
+                    </div>
+                    <div class="card-vendor-logo">VISA</div>
+                </div>
+            </div>
+            <div class="card-face card-back" id="cardBack">
+                <div class="magnetic-stripe"></div>
+                <div class="signature-panel">
+                    <span class="cvv" id="cardCvv">---</span>
+                </div>
+                </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-group color-picker">
+            <label for="bgColor1">Card Background Color 1:</label>
+            <input type="color" id="bgColor1" value="#4a90e2"> </div>
+        <div class="control-group color-picker">
+            <label for="bgColor2">Card Background Color 2:</label>
+            <input type="color" id="bgColor2" value="#8ec5fc"> </div>
+        <div class="control-group">
+            <label for="textColor">Text Color:</label>
+            <input type="color" id="textColor" value="#ffffff">
+        </div>
+        <div class="control-group">
+            <label for="nameInput">Cardholder Name:</label>
+            <input type="text" id="nameInput" placeholder="Enter name" maxlength="25">
+        </div>
+         <div class="control-group">
+            <label for="cardNumberInput">Card Number (Last 4):</label>
+            <input type="text" id="cardNumberInput" placeholder="1234" maxlength="4">
+        </div>
+        <div class="control-group">
+            <label for="expiryInput">Expiry Date (MM/YY):</label>
+            <input type="text" id="expiryInput" placeholder="MM/YY" maxlength="5">
+        </div>
+        <div class="control-group">
+            <label for="cvvInput">CVV:</label>
+            <input type="text" id="cvvInput" placeholder="123" maxlength="3">
+        </div>
+         <div class="control-group" style="grid-column: 1 / -1;"> <label for="logoUrlInput">Company Logo URL (Optional):</label>
+            <input type="text" id="logoUrlInput" placeholder="Paste image URL">
+        </div>
+         <div class="logo-toggle-group"> <input type="checkbox" id="toggleLogo">
+            <label for="toggleLogo">Show Company Logo</label>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const cardContainer = document.getElementById('cardContainer');
+        const cardFront = document.getElementById('cardFront');
+        const cardBack = document.getElementById('cardBack');
+        const bgColor1Input = document.getElementById('bgColor1'); // Renamed/Added
+        const bgColor2Input = document.getElementById('bgColor2'); // Added
+        const textColorInput = document.getElementById('textColor');
+        const nameInput = document.getElementById('nameInput');
+        const cardHolderName = document.getElementById('cardHolderName');
+        const cardNumberDisplay = document.getElementById('cardNumber');
+        const cardExpiryDisplay = document.getElementById('cardExpiry');
+        const cardCvvDisplay = document.getElementById('cardCvv');
+        const cardNumberInput = document.getElementById('cardNumberInput');
+        const expiryInput = document.getElementById('expiryInput');
+        const cvvInput = document.getElementById('cvvInput');
+        const logoUrlInput = document.getElementById('logoUrlInput');
+        const companyLogo = document.getElementById('companyLogo');
+        const toggleLogoCheckbox = document.getElementById('toggleLogo');
+
+        // --- Default Values ---
+        const defaultCardNumber = '**** **** **** ';
+        const defaultExpiry = 'MM/YY';
+        const defaultCvv = '***';
+        const defaultName = 'YOUR NAME HERE';
+
+        // --- Rotation Logic (Unchanged) ---
+        let isDragging = false;
+        let startX, startY;
+        let currentX = 0, currentY = 0; // Store current rotation angles
+
+        const startDrag = (e) => {
+            isDragging = true;
+            startX = (e.pageX || e.touches[0].pageX) - cardContainer.offsetLeft;
+            startY = (e.pageY || e.touches[0].pageY) - cardContainer.offsetTop;
+            cardContainer.style.transition = 'none';
+        };
+
+        const drag = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = (e.pageX || e.touches[0].pageX) - cardContainer.offsetLeft;
+            const y = (e.pageY || e.touches[0].pageY) - cardContainer.offsetTop;
+            const deltaX = x - startX;
+            const deltaY = y - startY;
+            const rotateY = currentY + deltaX * 0.5;
+            const rotateX = currentX - deltaY * 0.5;
+            cardContainer.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        };
+
+        const endDrag = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            cardContainer.style.transition = 'transform 0.3s ease-out';
+            const styleTransform = cardContainer.style.transform;
+            const matchX = styleTransform.match(/rotateX\(([-]?\d+(\.\d+)?)deg\)/);
+            const matchY = styleTransform.match(/rotateY\(([-]?\d+(\.\d+)?)deg\)/);
+            currentX = matchX ? parseFloat(matchX[1]) : currentX;
+            currentY = matchY ? parseFloat(matchY[1]) : currentY;
+        };
+
+        cardContainer.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        cardContainer.addEventListener('touchstart', startDrag);
+        document.addEventListener('touchmove', drag, { passive: false });
+        document.addEventListener('touchend', endDrag);
+
+
+        // --- Customization Logic ---
+
+        // Updated Function to update CSS Variables for Gradient and Text Color
+        const updateCardStyles = () => {
+            const root = document.documentElement;
+            root.style.setProperty('--card-bg-color1', bgColor1Input.value);
+            root.style.setProperty('--card-bg-color2', bgColor2Input.value);
+            root.style.setProperty('--card-text-color', textColorInput.value);
+        };
+
+        // Update Card Background Gradient Colors
+        bgColor1Input.addEventListener('input', updateCardStyles);
+        bgColor2Input.addEventListener('input', updateCardStyles);
+
+        // Update Text Color
+        textColorInput.addEventListener('input', updateCardStyles);
+
+        // Update Cardholder Name
+        nameInput.addEventListener('input', () => {
+            cardHolderName.textContent = nameInput.value.toUpperCase() || defaultName;
+        });
+
+        // Update Card Number (Last 4 Digits)
+        cardNumberInput.addEventListener('input', () => {
+            const lastFour = cardNumberInput.value.replace(/\D/g, '');
+            cardNumberDisplay.textContent = defaultCardNumber + (lastFour || '----');
+        });
+
+        // Update Expiry Date
+        expiryInput.addEventListener('input', () => {
+            let value = expiryInput.value.replace(/\D/g, '');
+            if (value.length > 2) {
+                value = value.substring(0, 2) + '/' + value.substring(2, 4);
+            } else if (value.length === 2 && expiryInput.value.length === 3 && expiryInput.value.endsWith('/')) {
+                value = value.substring(0,1);
+            }
+             expiryInput.value = value;
+            cardExpiryDisplay.textContent = value || defaultExpiry;
+        });
+
+         // Update CVV
+        cvvInput.addEventListener('input', () => {
+            const cvvValue = cvvInput.value.replace(/\D/g, '');
+            cardCvvDisplay.textContent = cvvValue || defaultCvv;
+        });
+
+        // Update Company Logo URL
+        logoUrlInput.addEventListener('input', () => {
+            const url = logoUrlInput.value.trim();
+            if (url) {
+                companyLogo.src = url;
+                companyLogo.style.display = toggleLogoCheckbox.checked ? 'block' : 'none';
+                companyLogo.classList.remove('error');
+            } else {
+                companyLogo.src = '';
+                companyLogo.style.display = 'none';
+            }
+        });
+
+        // Toggle Logo Visibility
+        toggleLogoCheckbox.addEventListener('change', () => {
+            if (companyLogo.src && !companyLogo.classList.contains('error')) {
+                 companyLogo.style.display = toggleLogoCheckbox.checked ? 'block' : 'none';
+            } else {
+                 companyLogo.style.display = 'none';
+            }
+        });
+
+        // --- Initial Setup ---
+        const initializeCard = () => {
+            updateCardStyles(); // Set initial colors/styles from input values
+            cardHolderName.textContent = defaultName;
+            cardNumberDisplay.textContent = defaultCardNumber + '----';
+            cardExpiryDisplay.textContent = defaultExpiry;
+            cardCvvDisplay.textContent = defaultCvv;
+            companyLogo.style.display = 'none'; // Ensure logo is hidden initially
+        }
+
+        // Run initialization on load
+        window.onload = initializeCard;
+
+    </script>
+
+</body>
+</html>
