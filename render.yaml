@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: static
     name: 3d-credit-card
     env: static
     buildCommand: echo "No build needed for static site"
