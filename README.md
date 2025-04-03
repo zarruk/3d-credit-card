@@ -13,7 +13,7 @@ A modern, interactive 3D credit card visualization built with HTML, CSS, and Jav
 
 ## Usage
 
-1. Open `prueba.html` in a modern web browser
+1. Open `index.html` in a modern web browser
 2. Interact with the card by clicking and dragging to rotate in 3D
 3. Use the control panel to customize:
    - Card background colors
@@ -34,7 +34,13 @@ A modern, interactive 3D credit card visualization built with HTML, CSS, and Jav
 
 ## Live Demo
 
-You can view the live demo by opening the `prueba.html` file directly in your web browser.
+You can view the live demo at: https://threed-credit-card-1.onrender.com
+
+## Local Development
+
+To run this project locally:
+1. Clone the repository
+2. Open `index.html` in your web browser
 
 ## License
 
